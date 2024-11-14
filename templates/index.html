@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<title>Terraformix - Create Template</title>
+<script>
+    // Function to update OS families based on selected region
+    function updateOSFamilies() {
+        const region = document.getElementById("region").value;
+        fetch(`/get_os_families?region=${region}`)
+            .then(response => response.json())
+            .then(data => {
+                const osFamilySelect = document.getElementById("os_family");
+                osFamilySelect.innerHTML = ""; // Clear current options
+                osFamilySelect.appendChild(new Option("Select OS Family", ""));
+                data.forEach(os => {
+                    const option = document.createElement("option");
+                    option.value = os;
+                    option.textContent = os.charAt(0).toUpperCase() + os.slice(1);
+                    osFamilySelect.appendChild(option);
+                });
+            });
+    }
+
+    // Function to update AMIs based on selected region and OS family
+    function updateAMIs() {
+        const region = document.getElementById("region").value;
+        const osFamily = document.getElementById("os_family").value;
+        if (!region || !osFamily) return;
+
+        fetch(`/get_amis?region=${region}&os_family=${osFamily}`)
+            .then(response => response.json())
+            .then(data => {
+                const amiSelect = document.getElementById("ami");
+                amiSelect.innerHTML = ""; // Clear current options
+                amiSelect.appendChild(new Option("Select AMI", ""));
+                data.forEach(ami => {
+                    const option = document.createElement("option");
+                    option.value = ami.id;
+                    option.textContent = `${ami.description} (${ami.id})`;
+                    amiSelect.appendChild(option);
+                });
+            });
+    }
+
+    // Function to update Instance Types based on selected region
+    function updateInstanceTypes() {
+        const region = document.getElementById("region").value;
+        fetch(`/get_instance_types?region=${region}`)
+            .then(response => response.json())
+            .then(data => {
+                const instanceTypeSelect = document.getElementById("instance_type");
+                instanceTypeSelect.innerHTML = ""; // Clear current options
+                instanceTypeSelect.appendChild(new Option("Select Instance Type", ""));
+                data.forEach(type => {
+                    const option = document.createElement("option");
+                    option.value = type;
+                    option.textContent = type;
+                    instanceTypeSelect.appendChild(option);
+                });
+            });
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        // Update OS families and instance types when region changes
+        document.getElementById("region").addEventListener("change", function() {
+            updateOSFamilies();
+            updateInstanceTypes();
+        });
+
+        document.getElementById("os_family").addEventListener("change", updateAMIs);
+    });
+</script>
+{% endblock %}
+
+{% block body %}
+<div class="content">
+    <h1 style="text-align: center">Create a Terraform Template</h1>
+    <div class="form">
+        <form action="/generate" method="POST">
+            <!-- Resource Name Input -->
+            <label for="resource_name">Resource Name:</label>
+            <input type="text" name="resource_name" id="resource_name" required><br>
+
+            <!-- Region Dropdown with Default Selection -->
+            <label for="region">Region:</label>
+            <select name="region" id="region" required>
+                <option value="">Select Region</option>
+                {% for region in regions %}
+                    <option value="{{ region }}">{{ region }}</option>
+                {% endfor %}
+            </select><br>
+
+            <!-- OS Family Dropdown -->
+            <label for="os_family">OS Family:</label>
+            <select name="os_family" id="os_family" required>
+                <option value="">Select OS Family</option>
+                <!-- Options will be populated dynamically based on region -->
+            </select><br>
+
+            <!-- AMI Dropdown (Populated Dynamically) -->
+            <label for="ami">AMI:</label>
+            <select name="ami" id="ami" required>
+                <option value="">Select AMI</option>
+                <!-- Options will be populated dynamically based on region and OS family -->
+            </select><br>
+
+            <!-- Instance Type Dropdown (Populated Dynamically) -->
+            <label for="instance_type">Instance Type:</label>
+            <select name="instance_type" id="instance_type" required>
+                <option value="">Select Instance Type</option>
+                <!-- Options will be populated dynamically based on region -->
+            </select><br>
+
+            <!-- Optional Storage Size Input -->
+            <label for="storage_size">Storage Size (GB) - Optional:</label>
+            <input type="number" name="storage_size" id="storage_size" min="0" placeholder="Enter GB if needed"><br>
+
+            <!-- Number of Instances Input with Default Value of 1 -->
+            <label for="instance_count">Number of Instances:</label>
+            <input type="number" name="instance_count" id="instance_count" min="1" value="1" required><br>
+
+            <!-- Submit Button -->
+            <input type="submit" value="Generate Template">
+        </form>
+    </div>
+</div>
+{% endblock %}
