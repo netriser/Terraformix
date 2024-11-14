@@ -54,54 +54,68 @@ def get_amis():
 # Route to generate the Terraform configurations based on form input
 @app.route('/generate', methods=['POST'])
 def generate_template():
-    terraform_code = ""
+    region = request.form['region']  # Single region selected at the top
+    provider_config = {
+        "region": region
+    }
+    terraform_code = render_template('terraform_templates/provider.tf', **provider_config)
+
+    def parse_tags(keys, values):
+        return {keys[i]: values[i] for i in range(len(keys)) if keys[i] and values[i]}
 
     # EC2 Configurations
     ec2_names = request.form.getlist('resource_name[]')
-    regions = request.form.getlist('region[]')
     instance_types = request.form.getlist('instance_type[]')
     amis = request.form.getlist('ami[]')
     storage_sizes = request.form.getlist('storage_size[]')
     instance_counts = request.form.getlist('instance_count[]')
-    ec2_tags = request.form.getlist('ec2_tags[]')
-
+    ec2_tag_keys = request.form.getlist('ec2_tag_keys[]')
+    ec2_tag_values = request.form.getlist('ec2_tag_values[]')
+    ec2_tags = parse_tags(ec2_tag_keys, ec2_tag_values)
+    
     for i in range(len(ec2_names)):
         ec2_config = {
             "resource_name": ec2_names[i],
-            "region": regions[i],
+            "region": region,
             "instance_type": instance_types[i],
             "ami_id": amis[i],
             "storage_size": storage_sizes[i] if storage_sizes[i] else None,
             "instance_count": instance_counts[i] if instance_counts[i] else 1,
-            "tags": json.loads(ec2_tags[i]) if ec2_tags[i] else {}
+            "tags": ec2_tags
         }
-        terraform_code += render_template('ec2.tf', **ec2_config)
+        terraform_code += render_template('terraform_templates/ec2.tf', **ec2_config)
 
     # VPC Configurations
     vpc_names = request.form.getlist('vpc_name[]')
     cidr_blocks = request.form.getlist('vpc_cidr[]')
-    vpc_tags = request.form.getlist('vpc_tags[]')
+    vpc_tag_keys = request.form.getlist('vpc_tag_keys[]')
+    vpc_tag_values = request.form.getlist('vpc_tag_values[]')
+    vpc_tags = parse_tags(vpc_tag_keys, vpc_tag_values)
 
     for i in range(len(vpc_names)):
         vpc_config = {
             "vpc_name": vpc_names[i],
+            "region": region,
             "cidr_block": cidr_blocks[i],
-            "tags": json.loads(vpc_tags[i]) if vpc_tags[i] else {}
+            "tags": vpc_tags
         }
-        terraform_code += render_template('vpc.tf', **vpc_config)
+        terraform_code += render_template('terraform_templates/vpc.tf', **vpc_config)
 
     # S3 Configurations
     bucket_names = request.form.getlist('bucket_name[]')
     versioning_enabled = request.form.getlist('versioning[]')
-    bucket_tags = request.form.getlist('bucket_tags[]')
+    s3_tag_keys = request.form.getlist('s3_tag_keys[]')
+    s3_tag_values = request.form.getlist('s3_tag_values[]')
+    s3_tags = parse_tags(s3_tag_keys, s3_tag_values)
 
     for i in range(len(bucket_names)):
         s3_config = {
             "bucket_name": bucket_names[i],
+            "region": region,
             "versioning_enabled": 'true' if i < len(versioning_enabled) and versioning_enabled[i] else 'false',
-            "tags": json.loads(bucket_tags[i]) if bucket_tags[i] else {}
+            "tags": s3_tags
         }
-        terraform_code += render_template('s3.tf', **s3_config)
+        terraform_code += render_template('terraform_templates/s3.tf', **s3_config)
 
     # Render the final Terraform code to output.html
     return render_template('output.html', terraform_code=terraform_code)
