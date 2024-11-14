@@ -3,13 +3,104 @@
 {% block head %}
 <title>Terraformix - Create Template</title>
 <script>
+    // JavaScript function to dynamically add new sections for each resource type with a remove button
+    function showSection(sectionId) {
+        const container = document.getElementById('dynamicSectionContainer');
+
+        if (sectionId === 'ec2Section') {
+            const newEC2Section = document.createElement('div');
+            newEC2Section.className = 'form-section';
+            newEC2Section.innerHTML = `
+                <h2>EC2 Configuration</h2>
+                <label for="resource_name">Resource Name:</label>
+                <input type="text" name="resource_name[]" required><br>
+
+                <label for="region">Region:</label>
+                <select name="region[]" onchange="updateInstanceTypes(this); updateOSFamilies(this)" required>
+                    <option value="">Select Region</option>
+                    {% for region in regions %}
+                        <option value="{{ region }}">{{ region }}</option>
+                    {% endfor %}
+                </select><br>
+
+                <label for="os_family">OS Family:</label>
+                <select name="os_family[]" onchange="updateAMIs(this)" required>
+                    <option value="">Select OS Family</option>
+                </select><br>
+
+                <label for="ami">AMI:</label>
+                <select name="ami[]" required>
+                    <option value="">Select AMI</option>
+                </select><br>
+
+                <label for="instance_type">Instance Type:</label>
+                <select name="instance_type[]" required>
+                    <option value="">Select Instance Type</option>
+                </select><br>
+
+                <label for="storage_size">Storage Size (GB):</label>
+                <input type="number" name="storage_size[]" min="0"><br>
+
+                <label for="instance_count">Number of Instances:</label>
+                <input type="number" name="instance_count[]" min="1" value="1" required><br>
+                <label for="ec2_tags">Tags (JSON format):</label>
+                <textarea name="ec2_tags[]" placeholder='{"Environment": "Dev"}'></textarea>
+                
+                <br><br><button type="button" onclick="removeSection(this)">Remove</button><br>
+            `;
+            container.appendChild(newEC2Section);
+
+        } else if (sectionId === 'vpcSection') {
+            const newVPCSection = document.createElement('div');
+            newVPCSection.className = 'form-section';
+            newVPCSection.innerHTML = `
+                <h2>VPC Configuration</h2>
+                <label for="vpc_name">VPC Name:</label>
+                <input type="text" name="vpc_name[]" required><br>
+
+                <label for="vpc_cidr">CIDR Block:</label>
+                <input type="text" name="vpc_cidr[]" placeholder="10.0.0.0/16" required><br>
+
+                <label for="vpc_tags">Tags (JSON format):</label>
+                <textarea name="vpc_tags[]" placeholder='{"Environment": "Dev"}'></textarea><br>
+
+                <br><br><button type="button" onclick="removeSection(this)">Remove</button><br>
+            `;
+            container.appendChild(newVPCSection);
+
+        } else if (sectionId === 's3Section') {
+            const newS3Section = document.createElement('div');
+            newS3Section.className = 'form-section';
+            newS3Section.innerHTML = `
+                <h2>S3 Bucket Configuration</h2>
+                <label for="bucket_name">Bucket Name:</label>
+                <input type="text" name="bucket_name[]" required><br>
+
+                <label for="versioning">Enable Versioning:</label>
+                <input type="checkbox" name="versioning[]"><br>
+
+                <label for="bucket_tags">Tags (JSON format):</label>
+                <textarea name="bucket_tags[]" placeholder='{"Environment": "Dev"}'></textarea><br>
+
+                <br><br><button type="button" onclick="removeSection(this)">Remove</button><br>
+            `;
+            container.appendChild(newS3Section);
+        }
+    }
+
+    // Function to remove a specific section
+    function removeSection(button) {
+        button.parentElement.remove();
+    }
+
     // Function to update OS families based on selected region
-    function updateOSFamilies() {
-        const region = document.getElementById("region").value;
+    function updateOSFamilies(regionSelect) {
+        const region = regionSelect.value;
+        const osFamilySelect = regionSelect.parentElement.querySelector('select[name="os_family[]"]');
+
         fetch(`/get_os_families?region=${region}`)
             .then(response => response.json())
             .then(data => {
-                const osFamilySelect = document.getElementById("os_family");
                 osFamilySelect.innerHTML = ""; // Clear current options
                 osFamilySelect.appendChild(new Option("Select OS Family", ""));
                 data.forEach(os => {
@@ -22,15 +113,16 @@
     }
 
     // Function to update AMIs based on selected region and OS family
-    function updateAMIs() {
-        const region = document.getElementById("region").value;
-        const osFamily = document.getElementById("os_family").value;
+    function updateAMIs(osFamilySelect) {
+        const region = osFamilySelect.parentElement.querySelector('select[name="region[]"]').value;
+        const osFamily = osFamilySelect.value;
+        const amiSelect = osFamilySelect.parentElement.querySelector('select[name="ami[]"]');
+
         if (!region || !osFamily) return;
 
         fetch(`/get_amis?region=${region}&os_family=${osFamily}`)
             .then(response => response.json())
             .then(data => {
-                const amiSelect = document.getElementById("ami");
                 amiSelect.innerHTML = ""; // Clear current options
                 amiSelect.appendChild(new Option("Select AMI", ""));
                 data.forEach(ami => {
@@ -43,12 +135,13 @@
     }
 
     // Function to update Instance Types based on selected region
-    function updateInstanceTypes() {
-        const region = document.getElementById("region").value;
+    function updateInstanceTypes(regionSelect) {
+        const region = regionSelect.value;
+        const instanceTypeSelect = regionSelect.parentElement.querySelector('select[name="instance_type[]"]');
+
         fetch(`/get_instance_types?region=${region}`)
             .then(response => response.json())
             .then(data => {
-                const instanceTypeSelect = document.getElementById("instance_type");
                 instanceTypeSelect.innerHTML = ""; // Clear current options
                 instanceTypeSelect.appendChild(new Option("Select Instance Type", ""));
                 data.forEach(type => {
@@ -59,69 +152,27 @@
                 });
             });
     }
-
-    document.addEventListener("DOMContentLoaded", function() {
-        // Update OS families and instance types when region changes
-        document.getElementById("region").addEventListener("change", function() {
-            updateOSFamilies();
-            updateInstanceTypes();
-        });
-
-        document.getElementById("os_family").addEventListener("change", updateAMIs);
-    });
 </script>
 {% endblock %}
 
 {% block body %}
 <div class="content">
     <h1 style="text-align: center">Create a Terraform Template</h1>
-    <div class="form">
-        <form action="/generate" method="POST">
-            <!-- Resource Name Input -->
-            <label for="resource_name">Resource Name:</label>
-            <input type="text" name="resource_name" id="resource_name" required><br>
 
-            <!-- Region Dropdown with Default Selection -->
-            <label for="region">Region:</label>
-            <select name="region" id="region" required>
-                <option value="">Select Region</option>
-                {% for region in regions %}
-                    <option value="{{ region }}">{{ region }}</option>
-                {% endfor %}
-            </select><br>
-
-            <!-- OS Family Dropdown -->
-            <label for="os_family">OS Family:</label>
-            <select name="os_family" id="os_family" required>
-                <option value="">Select OS Family</option>
-                <!-- Options will be populated dynamically based on region -->
-            </select><br>
-
-            <!-- AMI Dropdown (Populated Dynamically) -->
-            <label for="ami">AMI:</label>
-            <select name="ami" id="ami" required>
-                <option value="">Select AMI</option>
-                <!-- Options will be populated dynamically based on region and OS family -->
-            </select><br>
-
-            <!-- Instance Type Dropdown (Populated Dynamically) -->
-            <label for="instance_type">Instance Type:</label>
-            <select name="instance_type" id="instance_type" required>
-                <option value="">Select Instance Type</option>
-                <!-- Options will be populated dynamically based on region -->
-            </select><br>
-
-            <!-- Optional Storage Size Input -->
-            <label for="storage_size">Storage Size (GB) - Optional:</label>
-            <input type="number" name="storage_size" id="storage_size" min="0" placeholder="Enter GB if needed"><br>
-
-            <!-- Number of Instances Input with Default Value of 1 -->
-            <label for="instance_count">Number of Instances:</label>
-            <input type="number" name="instance_count" id="instance_count" min="1" value="1" required><br>
-
-            <!-- Submit Button -->
-            <input type="submit" value="Generate Template">
-        </form>
+    <!-- Shortcut buttons to add sections dynamically -->
+    <div class="shortcut-container">
+        <button type="button" onclick="showSection('ec2Section')">Configure EC2 Instance</button>
+        <button type="button" onclick="showSection('vpcSection')">Configure VPC</button>
+        <button type="button" onclick="showSection('s3Section')">Configure S3 Bucket</button>
     </div>
+
+    <!-- Unified form with a dynamic section container for adding configurations -->
+    <form action="/generate" method="POST">
+        <!-- Dynamic container for new sections -->
+        <div id="dynamicSectionContainer"></div>
+
+        <!-- Submit Button -->
+        <input type="submit" value="Generate Template">
+    </form>
 </div>
 {% endblock %}
